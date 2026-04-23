@@ -1,5 +1,5 @@
 package memory
 
 const (
-	tzOffline = 0x29B3208
+	tzOffline = 0x25B2300
 )
