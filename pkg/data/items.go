@@ -3,8 +3,8 @@ package data
 import (
 	"strings"
 
-	"github.com/hectorgimenez/d2go/pkg/data/item"
-	"github.com/hectorgimenez/d2go/pkg/data/stat"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/item"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/stat"
 )
 
 type Inventory struct {

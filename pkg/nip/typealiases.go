@@ -1,6 +1,6 @@
 package nip
 
-import "github.com/hectorgimenez/d2go/pkg/data/item"
+import "github.com/ooeygg/remas/back/d2go/pkg/data/item"
 
 var TypeAliases = typeAliases
 var typeAliases = map[string]string{

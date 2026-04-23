@@ -8,9 +8,9 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
-	"github.com/hectorgimenez/d2go/pkg/data"
-	"github.com/hectorgimenez/d2go/pkg/data/item"
-	"github.com/hectorgimenez/d2go/pkg/data/stat"
+	"github.com/ooeygg/remas/back/d2go/pkg/data"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/item"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/stat"
 )
 
 const (

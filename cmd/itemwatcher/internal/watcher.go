@@ -9,11 +9,11 @@ import (
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/speaker"
 	"github.com/gopxl/beep/wav"
-	"github.com/hectorgimenez/d2go/pkg/data"
-	"github.com/hectorgimenez/d2go/pkg/data/area"
-	"github.com/hectorgimenez/d2go/pkg/data/item"
-	"github.com/hectorgimenez/d2go/pkg/memory"
-	"github.com/hectorgimenez/d2go/pkg/nip"
+	"github.com/ooeygg/remas/back/d2go/pkg/data"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/area"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/item"
+	"github.com/ooeygg/remas/back/d2go/pkg/memory"
+	"github.com/ooeygg/remas/back/d2go/pkg/nip"
 )
 
 type Watcher struct {

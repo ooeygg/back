@@ -1,12 +1,12 @@
 package data
 
 import (
-	"github.com/hectorgimenez/d2go/pkg/data/mode"
-	"github.com/hectorgimenez/d2go/pkg/data/monplace"
-	"github.com/hectorgimenez/d2go/pkg/data/npc"
-	"github.com/hectorgimenez/d2go/pkg/data/stat"
-	"github.com/hectorgimenez/d2go/pkg/data/state"
-	"github.com/hectorgimenez/d2go/pkg/data/superunique"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/mode"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/monplace"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/npc"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/stat"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/state"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/superunique"
 )
 
 type NPC struct {

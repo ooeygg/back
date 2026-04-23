@@ -1,8 +1,8 @@
 package npc
 
 import (
-	"github.com/hectorgimenez/d2go/pkg/data/monplace"
-	"github.com/hectorgimenez/d2go/pkg/data/superunique"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/monplace"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/superunique"
 )
 
 type PresetUnit struct {

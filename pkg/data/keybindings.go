@@ -1,6 +1,6 @@
 package data
 
-import "github.com/hectorgimenez/d2go/pkg/data/skill"
+import "github.com/ooeygg/remas/back/d2go/pkg/data/skill"
 
 type KeyBindings struct {
 	CharacterScreen KeyBinding

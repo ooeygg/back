@@ -1,7 +1,7 @@
 package memory
 
 import (
-	"github.com/hectorgimenez/d2go/pkg/data"
+	"github.com/ooeygg/remas/back/d2go/pkg/data"
 )
 
 func NewPanel(panelPtr uintptr, panelParent string, depth int, gd *GameReader) *data.Panel { //itemUnitPtr = uintptr(gd.Process.ReadUInt(itemUnitPtr+0x158, Uint64))

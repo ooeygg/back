@@ -1,7 +1,7 @@
 package data
 
 import (
-	"github.com/hectorgimenez/d2go/pkg/data/entrance"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/entrance"
 )
 
 type Entrance struct {

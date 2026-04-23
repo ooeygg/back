@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hectorgimenez/d2go/pkg/data"
-	"github.com/hectorgimenez/d2go/pkg/data/skill"
-	"github.com/hectorgimenez/d2go/pkg/data/stat"
+	"github.com/ooeygg/remas/back/d2go/pkg/data"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/skill"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/stat"
 )
 
 type GameReader struct {

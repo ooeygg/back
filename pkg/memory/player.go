@@ -3,13 +3,13 @@ package memory
 import (
 	"encoding/binary"
 
-	"github.com/hectorgimenez/d2go/pkg/data/mode"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/mode"
 
-	"github.com/hectorgimenez/d2go/pkg/data"
-	"github.com/hectorgimenez/d2go/pkg/data/area"
-	"github.com/hectorgimenez/d2go/pkg/data/game"
-	"github.com/hectorgimenez/d2go/pkg/data/skill"
-	"github.com/hectorgimenez/d2go/pkg/data/state"
+	"github.com/ooeygg/remas/back/d2go/pkg/data"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/area"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/game"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/skill"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/state"
 )
 
 func (gd *GameReader) GetRawPlayerUnits() RawPlayerUnits {

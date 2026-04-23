@@ -1,8 +1,8 @@
 package data
 
 import (
-	"github.com/hectorgimenez/d2go/pkg/data/mode"
-	"github.com/hectorgimenez/d2go/pkg/data/object"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/mode"
+	"github.com/ooeygg/remas/back/d2go/pkg/data/object"
 )
 
 type Object struct {
