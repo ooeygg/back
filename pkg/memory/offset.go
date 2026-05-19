@@ -26,37 +26,37 @@ type Offset struct {
 
 func calculateOffsets(_ *Process) Offset {
 	// UnitTable
-	unitTableOffset := uintptr(0x1EB7460)
+	unitTableOffset := uintptr(0x1EA73D0)
 
 	// UI
-	uiOffsetPtr := uintptr(0x1EC715A)
+	uiOffsetPtr := uintptr(0x1EB70CA)
 
 	// Hover
-	hoverOffset := uintptr(0x1E0B110)
+	hoverOffset := uintptr(0x1DFB080)
 
 	// Expansion
-	expOffset := uintptr(0x1E0A578)
+	expOffset := uintptr(0x1DFA4E8)
 
 	// Party members offset
-	rosterOffset := uintptr(0x1ECD778)
+	rosterOffset := uintptr(0x1EBD6E8)
 
 	// PanelManagerContainer
-	panelManagerContainerOffset := uintptr(0x1E21ED0)
+	panelManagerContainerOffset := uintptr(0x1E11E40)
 
 	// WidgetStates
-	WidgetStatesOffset := uintptr(0x1EEF790)
+	WidgetStatesOffset := uintptr(0x1EDF700)
 
 	// Waypoints
-	WaypointTableOffset := uintptr(0x1D694D0)
+	WaypointTableOffset := uintptr(0x1D59440)
 
 	// FPS
-	fpsOffset := uintptr(0x1D694A4)
+	fpsOffset := uintptr(0x1D59414)
 
 	// KeyBindings
-	keyBindingsOffset := uintptr(0x19E1434)
+	keyBindingsOffset := uintptr(0x19D25B4)
 
 	// KeyBindings Skills
-	keyBindingsSkillsOffset := uintptr(0x1E0B220)
+	keyBindingsSkillsOffset := uintptr(0x1DFB190)
 
 	// QuestInfo
 	questInfoOffset := uintptr(0x1ED3DE8)
@@ -65,16 +65,16 @@ func calculateOffsets(_ *Process) Offset {
 	tzOffset := uintptr(0x25B1B80)
 
 	// Ping
-	pingOffset := uintptr(0x1E0A578)
+	pingOffset := uintptr(0x1DFA4E8)
 
 	// LegacyGraphics
-	legacyGfxOffset := uintptr(0x1ED4056)
+	legacyGfxOffset := uintptr(0x1EC3FC6)
 
 	// CharData
-	charDataOffset := uintptr(0x1E0E708)
+	charDataOffset := uintptr(0x1DFE678)
 
 	// Selected Char Name
-	selectedCharNameOffset := uintptr(0x1D60295)
+	selectedCharNameOffset := uintptr(0x1D50215)
 
 	// Last Game Name
 	lastGameNameOffset := uintptr(0x25FA4E0)

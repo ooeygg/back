@@ -104,6 +104,9 @@ func (d Data) MercHPPercent() int {
 		if m.IsMerc() {
 			// Hacky thing to read merc life properly
 			maxLife := m.Stats[stat.MaxLife] >> 8
+			if maxLife <= 0 {
+				return 0
+			}
 			life := float64(m.Stats[stat.Life] >> 8)
 			if m.Stats[stat.Life] <= 32768 {
 				life = float64(m.Stats[stat.Life]) / 32768.0 * float64(maxLife)
@@ -211,6 +214,9 @@ func (pu PlayerUnit) IsDead() bool {
 func (pu PlayerUnit) HPPercent() int {
 	life, _ := pu.FindStat(stat.Life, 0)
 	maxLife, _ := pu.FindStat(stat.MaxLife, 0)
+	if maxLife.Value <= 0 {
+		maxLife.Value = 1
+	}
 
 	return int((float64(life.Value) / float64(maxLife.Value)) * 100)
 }
@@ -218,6 +224,9 @@ func (pu PlayerUnit) HPPercent() int {
 func (pu PlayerUnit) MPPercent() int {
 	mana, _ := pu.FindStat(stat.Mana, 0)
 	maxMana, _ := pu.FindStat(stat.MaxMana, 0)
+	if maxMana.Value <= 0 {
+		maxMana.Value = 1
+	}
 
 	return int((float64(mana.Value) / float64(maxMana.Value)) * 100)
 }

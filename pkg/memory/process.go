@@ -4,23 +4,118 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
-const moduleName = "d2r.exe"
+const (
+	moduleName                  = "d2r.exe"
+	defaultMaxRemoteStringBytes = uint(4096)
+	remoteStringChunkSize       = uint(256)
+	readCoalesceGap             = uintptr(64)
+)
 
 type Process struct {
 	handler              windows.Handle
 	pid                  uint32
 	moduleBaseAddressPtr uintptr
 	moduleBaseSize       uint32
+	provider             MemoryProvider
 	sendPacket           *sendPacketState
 	sendPacketMu         sync.Mutex
+}
+
+// MemoryProvider is the process-memory read boundary. Parsers should depend on
+// Process methods, and Process delegates actual remote reads through this
+// provider so read metrics and alternative implementations stay centralized.
+type MemoryProvider interface {
+	ReadAt(address uintptr, dst []byte) error
+	Stats() ReadStats
+}
+
+// ReadStats contains coarse counters for remote memory reads made through a
+// MemoryProvider.
+type ReadStats struct {
+	Calls       uint64
+	Bytes       uint64
+	Failures    uint64
+	LastLatency time.Duration
+}
+
+type readStatsCounters struct {
+	calls            atomic.Uint64
+	bytes            atomic.Uint64
+	failures         atomic.Uint64
+	lastLatencyNanos atomic.Int64
+}
+
+func (s *readStatsCounters) record(size int, latency time.Duration, err error) {
+	s.calls.Add(1)
+	s.bytes.Add(uint64(size))
+	s.lastLatencyNanos.Store(latency.Nanoseconds())
+	if err != nil {
+		s.failures.Add(1)
+	}
+}
+
+func (s *readStatsCounters) snapshot() ReadStats {
+	return ReadStats{
+		Calls:       s.calls.Load(),
+		Bytes:       s.bytes.Load(),
+		Failures:    s.failures.Load(),
+		LastLatency: time.Duration(s.lastLatencyNanos.Load()),
+	}
+}
+
+type win32MemoryProvider struct {
+	handle windows.Handle
+	stats  readStatsCounters
+}
+
+func newWin32MemoryProvider(handle windows.Handle) *win32MemoryProvider {
+	return &win32MemoryProvider{handle: handle}
+}
+
+func (p *win32MemoryProvider) ReadAt(address uintptr, dst []byte) error {
+	if len(dst) == 0 {
+		return nil
+	}
+	start := time.Now()
+	err := windows.ReadProcessMemory(p.handle, address, &dst[0], uintptr(len(dst)), nil)
+	p.stats.record(len(dst), time.Since(start), err)
+	return err
+}
+
+func (p *win32MemoryProvider) Stats() ReadStats {
+	return p.stats.snapshot()
+}
+
+// ReadRequest is a single remote memory read destination used by ReadBatch.
+type ReadRequest struct {
+	Name    string
+	Address uintptr
+	Dst     []byte
+}
+
+// ReadResult reports the outcome of one ReadBatch request.
+type ReadResult struct {
+	Name    string
+	Address uintptr
+	Size    int
+	Err     error
+}
+
+type readRange struct {
+	base uintptr
+	end  uintptr
+	reqs []int
 }
 
 const (
@@ -46,6 +141,7 @@ func NewProcess() (*Process, error) {
 		pid:                  module.ProcessID,
 		moduleBaseAddressPtr: module.ModuleBaseAddress,
 		moduleBaseSize:       module.ModuleBaseSize,
+		provider:             newWin32MemoryProvider(h),
 	}, nil
 }
 
@@ -65,11 +161,39 @@ func NewProcessForPID(pid uint32) (*Process, error) {
 		pid:                  module.ProcessID,
 		moduleBaseAddressPtr: module.ModuleBaseAddress,
 		moduleBaseSize:       module.ModuleBaseSize,
+		provider:             newWin32MemoryProvider(h),
 	}, nil
 }
 
 func (p *Process) Close() error {
+	if p == nil || p.handler == 0 {
+		return nil
+	}
 	return windows.CloseHandle(p.handler)
+}
+
+// ReadStats returns remote-read counters for this process.
+func (p *Process) ReadStats() ReadStats {
+	if p == nil || p.provider == nil {
+		return ReadStats{}
+	}
+	return p.provider.Stats()
+}
+
+func (p *Process) readAt(address uintptr, dst []byte) error {
+	if len(dst) == 0 {
+		return nil
+	}
+	if p == nil {
+		return errors.New("process is nil")
+	}
+	if p.provider != nil {
+		return p.provider.ReadAt(address, dst)
+	}
+	if p.handler == 0 {
+		return errors.New("process handle is invalid")
+	}
+	return windows.ReadProcessMemory(p.handler, address, &dst[0], uintptr(len(dst)), nil)
 }
 
 // ModuleBaseAddress returns the base address of the D2R module.
@@ -153,13 +277,6 @@ func ReadMemoryChunked(handle windows.Handle, baseAddress uintptr, size uint32) 
 	return data, nil
 }
 
-func (p *Process) ReadBytesFromMemory(address uintptr, size uint) []byte {
-	var data = make([]byte, size)
-	windows.ReadProcessMemory(p.handler, address, &data[0], uintptr(size), nil)
-
-	return data
-}
-
 type IntType uint
 
 const (
@@ -169,58 +286,183 @@ const (
 	Uint64 = 8
 )
 
-func (p *Process) ReadUInt(address uintptr, size IntType) uint {
-	bytes := p.ReadBytesFromMemory(address, uint(size))
-
-	return bytesToUint(bytes, size)
-}
-
-func ReadUIntFromBuffer(bytes []byte, offset uint, size IntType) uint {
-	return bytesToUint(bytes[offset:offset+uint(size)], size)
-}
-
-func bytesToUint(bytes []byte, size IntType) uint {
-	switch size {
-	case Uint8:
-		return uint(bytes[0])
-	case Uint16:
-		return uint(binary.LittleEndian.Uint16(bytes))
-	case Uint32:
-		return uint(binary.LittleEndian.Uint32(bytes))
-	case Uint64:
-		return uint(binary.LittleEndian.Uint64(bytes))
-	}
-
-	return 0
-}
-func ReadIntFromBuffer(bytes []byte, offset uint, size IntType) int {
-	return bytesToInt(bytes[offset:offset+uint(size)], size)
-}
-func bytesToInt(bytes []byte, size IntType) int {
-	switch size {
-	case Int8:
-		return int(int8(bytes[0]))
-	case Int16:
-		return int(int16(binary.LittleEndian.Uint16(bytes)))
-	case Int32:
-		return int(int32(binary.LittleEndian.Uint32(bytes)))
-	case Int64:
-		return int(int64(binary.LittleEndian.Uint64(bytes)))
-	}
-	return 0
-}
-
-func (p *Process) ReadStringFromMemory(address uintptr, size uint) string {
+// ReadBytes reads exactly size bytes from remote process memory.
+func (p *Process) ReadBytes(address uintptr, size uint) ([]byte, error) {
 	if size == 0 {
-		for i := 1; true; i++ {
-			data := p.ReadBytesFromMemory(address, uint(i))
-			if data[i-1] == 0 {
-				return string(bytes.Trim(data, "\x00"))
+		return []byte{}, nil
+	}
+	data := make([]byte, size)
+	if err := p.readAt(address, data); err != nil {
+		return data, err
+	}
+	return data, nil
+}
+
+func (p *Process) ReadBytesFromMemory(address uintptr, size uint) []byte {
+	data, _ := p.ReadBytes(address, size)
+	return data
+}
+
+// ReadUIntWithError reads an unsigned little-endian integer from remote memory.
+func (p *Process) ReadUIntWithError(address uintptr, size IntType) (uint, error) {
+	if size != Uint8 && size != Uint16 && size != Uint32 && size != Uint64 {
+		return 0, errors.New("invalid unsigned integer read size")
+	}
+	data, err := p.ReadBytes(address, uint(size))
+	if err != nil {
+		return 0, err
+	}
+	return bytesToUint(data, size), nil
+}
+
+func (p *Process) ReadUInt(address uintptr, size IntType) uint {
+	value, _ := p.ReadUIntWithError(address, size)
+	return value
+}
+
+// ReadBatch reads multiple memory ranges and coalesces adjacent requests into
+// fewer underlying process-memory reads.
+func (p *Process) ReadBatch(reqs []ReadRequest) []ReadResult {
+	results := make([]ReadResult, len(reqs))
+	for i, req := range reqs {
+		results[i] = ReadResult{Name: req.Name, Address: req.Address, Size: len(req.Dst)}
+	}
+	if len(reqs) == 0 {
+		return results
+	}
+
+	for _, rr := range coalesceReadRequests(reqs) {
+		buffer := make([]byte, int(rr.end-rr.base))
+		if err := p.ReadIntoBuffer(rr.base, buffer); err != nil {
+			for _, idx := range rr.reqs {
+				results[idx].Err = err
 			}
+			continue
+		}
+
+		for _, idx := range rr.reqs {
+			req := reqs[idx]
+			offset := int(req.Address - rr.base)
+			copy(req.Dst, buffer[offset:offset+len(req.Dst)])
 		}
 	}
 
-	return string(bytes.Trim(p.ReadBytesFromMemory(address, size), "\x00"))
+	return results
+}
+
+func coalesceReadRequests(reqs []ReadRequest) []readRange {
+	order := make([]int, 0, len(reqs))
+	for i, req := range reqs {
+		if len(req.Dst) > 0 {
+			order = append(order, i)
+		}
+	}
+	sort.Slice(order, func(i, j int) bool {
+		return reqs[order[i]].Address < reqs[order[j]].Address
+	})
+
+	ranges := make([]readRange, 0, len(order))
+	for _, idx := range order {
+		req := reqs[idx]
+		base := req.Address
+		end := base + uintptr(len(req.Dst))
+
+		if len(ranges) == 0 || base > ranges[len(ranges)-1].end+readCoalesceGap {
+			ranges = append(ranges, readRange{base: base, end: end, reqs: []int{idx}})
+			continue
+		}
+
+		last := &ranges[len(ranges)-1]
+		if end > last.end {
+			last.end = end
+		}
+		last.reqs = append(last.reqs, idx)
+	}
+
+	return ranges
+}
+
+func ReadUIntFromBuffer(buf []byte, offset uint, size IntType) uint {
+	return bytesToUint(buf[offset:offset+uint(size)], size)
+}
+
+func bytesToUint(buf []byte, size IntType) uint {
+	switch size {
+	case Uint8:
+		return uint(buf[0])
+	case Uint16:
+		return uint(binary.LittleEndian.Uint16(buf))
+	case Uint32:
+		return uint(binary.LittleEndian.Uint32(buf))
+	case Uint64:
+		return uint(binary.LittleEndian.Uint64(buf))
+	}
+
+	return 0
+}
+func ReadIntFromBuffer(buf []byte, offset uint, size IntType) int {
+	return bytesToInt(buf[offset:offset+uint(size)], size)
+}
+func bytesToInt(buf []byte, size IntType) int {
+	switch size {
+	case Int8:
+		return int(int8(buf[0]))
+	case Int16:
+		return int(int16(binary.LittleEndian.Uint16(buf)))
+	case Int32:
+		return int(int32(binary.LittleEndian.Uint32(buf)))
+	case Int64:
+		return int(int64(binary.LittleEndian.Uint64(buf)))
+	}
+	return 0
+}
+
+// ReadStringBounded reads a NUL-terminated remote string with a hard maximum
+// length. When size is nonzero, it reads that fixed width and trims NUL bytes.
+func (p *Process) ReadStringBounded(address uintptr, size, max uint) (string, error) {
+	if address == 0 {
+		return "", errors.New("cannot read string at null address")
+	}
+	if max == 0 {
+		max = defaultMaxRemoteStringBytes
+	}
+	if size > max {
+		size = max
+	}
+	if size > 0 {
+		data, err := p.ReadBytes(address, size)
+		if err != nil {
+			return "", err
+		}
+		return string(bytes.Trim(data, "\x00")), nil
+	}
+
+	out := make([]byte, 0, remoteStringChunkSize)
+	for read := uint(0); read < max; {
+		chunkSize := remoteStringChunkSize
+		if remaining := max - read; remaining < chunkSize {
+			chunkSize = remaining
+		}
+
+		chunk := make([]byte, chunkSize)
+		if err := p.ReadIntoBuffer(address+uintptr(read), chunk); err != nil {
+			return string(bytes.Trim(out, "\x00")), err
+		}
+
+		if idx := bytes.IndexByte(chunk, 0); idx >= 0 {
+			out = append(out, chunk[:idx]...)
+			return string(out), nil
+		}
+		out = append(out, chunk...)
+		read += chunkSize
+	}
+
+	return string(bytes.Trim(out, "\x00")), nil
+}
+
+func (p *Process) ReadStringFromMemory(address uintptr, size uint) string {
+	value, _ := p.ReadStringBounded(address, size, defaultMaxRemoteStringBytes)
+	return value
 }
 
 func (p *Process) findPattern(memory []byte, pattern, mask string) int {
@@ -314,16 +556,15 @@ func GetProcessModules(processID uint32) ([]ModuleInfo, error) {
 
 // ReadPointer reads a pointer from the specified memory address.
 func (p *Process) ReadPointer(address uintptr, size int) (uintptr, error) {
-	buffer := p.ReadBytesFromMemory(address, uint(size))
-	if len(buffer) == 0 {
-		return 0, errors.New("failed to read memory")
+	if size != Int8 && size != Int16 && size != Int32 && size != Int64 {
+		return 0, errors.New("invalid pointer read size")
 	}
-
-	return uintptr(*(*uint64)(unsafe.Pointer(&buffer[0]))), nil
+	value, err := p.ReadUIntWithError(address, IntType(size))
+	return uintptr(value), err
 }
 
 func (p *Process) ReadIntoBuffer(address uintptr, buffer []byte) error {
-	return windows.ReadProcessMemory(p.handler, address, &buffer[0], uintptr(len(buffer)), nil)
+	return p.readAt(address, buffer)
 }
 
 // ReadWidgetContainer reads the WidgetContainer structure.

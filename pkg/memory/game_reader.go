@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ooeygg/remas/back/d2go/pkg/data"
@@ -26,6 +27,22 @@ type GameReader struct {
 	cachedMonsters  data.Monsters
 	cachedInventory data.Inventory
 	cachedObjects   []data.Object
+
+	panelCacheMu      sync.RWMutex
+	panelCache        map[string]data.Panel
+	panelCacheExpires time.Time
+
+	snapshotStatsMu   sync.RWMutex
+	lastSnapshotStats SnapshotStats
+}
+
+// SnapshotStats contains timing and remote-read metrics for the most recent
+// GameReader.GetData call.
+type SnapshotStats struct {
+	StartedAt   time.Time
+	CompletedAt time.Time
+	Duration    time.Duration
+	ReadStats   ReadStats
 }
 
 type MercOption struct {
@@ -51,6 +68,8 @@ var WidgetStateFlags = map[string]uint64{
 
 var firstNumberText = regexp.MustCompile(`\d[\d,]*`)
 
+const panelCacheTTL = 75 * time.Millisecond
+
 func NewGameReader(process *Process) *GameReader {
 	return &GameReader{
 		offset:              calculateOffsets(process),
@@ -62,6 +81,10 @@ func NewGameReader(process *Process) *GameReader {
 }
 
 func (gd *GameReader) GetData() data.Data {
+	startedAt := time.Now()
+	beforeReads := gd.Process.ReadStats()
+	defer gd.recordSnapshotStats(startedAt, beforeReads)
+
 	if gd.offset.UnitTable == 0 {
 		gd.offset = calculateOffsets(gd.Process)
 	}
@@ -150,6 +173,36 @@ func (gd *GameReader) GetData() data.Data {
 	return d
 }
 
+// LastSnapshotStats returns metrics captured from the most recent GetData call.
+func (gd *GameReader) LastSnapshotStats() SnapshotStats {
+	gd.snapshotStatsMu.RLock()
+	defer gd.snapshotStatsMu.RUnlock()
+	return gd.lastSnapshotStats
+}
+
+func (gd *GameReader) recordSnapshotStats(startedAt time.Time, beforeReads ReadStats) {
+	completedAt := time.Now()
+	afterReads := gd.Process.ReadStats()
+
+	gd.snapshotStatsMu.Lock()
+	defer gd.snapshotStatsMu.Unlock()
+	gd.lastSnapshotStats = SnapshotStats{
+		StartedAt:   startedAt,
+		CompletedAt: completedAt,
+		Duration:    completedAt.Sub(startedAt),
+		ReadStats:   diffReadStats(afterReads, beforeReads),
+	}
+}
+
+func diffReadStats(after, before ReadStats) ReadStats {
+	return ReadStats{
+		Calls:       after.Calls - before.Calls,
+		Bytes:       after.Bytes - before.Bytes,
+		Failures:    after.Failures - before.Failures,
+		LastLatency: after.LastLatency,
+	}
+}
+
 func (gd *GameReader) GetInventory() data.Inventory {
 	rawPlayerUnits := gd.GetRawPlayerUnits()
 	hover := gd.HoveredData()
@@ -216,7 +269,7 @@ func (gd *GameReader) getStatsList(statListPtr uintptr) stat.Stats {
 	statsListBuffer := gd.ReadBytesFromMemory(statListPtr, 0x10)
 	statList := ReadUIntFromBuffer(statsListBuffer, 0, Uint64)
 	statCount := ReadUIntFromBuffer(statsListBuffer, 0x08, Uint64)
-	if statCount == 0 {
+	if statCount == 0 || statCount > 500 {
 		return []stat.Data{}
 	}
 
@@ -225,6 +278,9 @@ func (gd *GameReader) getStatsList(statListPtr uintptr) stat.Stats {
 	statBuffer := gd.Process.ReadBytesFromMemory(uintptr(statList), statCount*10)
 	for i := 0; i < int(statCount); i++ {
 		offset := uint(i * 8)
+		if int(offset)+8 > len(statBuffer) {
+			break
+		}
 
 		statLayer := ReadUIntFromBuffer(statBuffer, offset, Uint16)
 		statEnum := ReadUIntFromBuffer(statBuffer, offset+0x2, Uint16)

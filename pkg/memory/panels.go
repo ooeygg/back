@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"time"
+
 	"github.com/ooeygg/remas/back/d2go/pkg/data"
 )
 
@@ -55,8 +57,38 @@ func isASCII(s string) bool {
 	return true
 }
 
-// ReadAllPanels reads all panels from the game memory
+// InvalidatePanelCache forces the next panel read to refresh from process memory.
+func (gd *GameReader) InvalidatePanelCache() {
+	gd.panelCacheMu.Lock()
+	defer gd.panelCacheMu.Unlock()
+
+	gd.panelCache = nil
+	gd.panelCacheExpires = time.Time{}
+}
+
+// ReadAllPanels reads all panels from the game memory.
 func (gd *GameReader) ReadAllPanels() map[string]data.Panel {
+	now := time.Now()
+
+	gd.panelCacheMu.RLock()
+	if gd.panelCache != nil && now.Before(gd.panelCacheExpires) {
+		panels := gd.panelCache
+		gd.panelCacheMu.RUnlock()
+		return panels
+	}
+	gd.panelCacheMu.RUnlock()
+
+	panels := gd.readAllPanelsFresh()
+
+	gd.panelCacheMu.Lock()
+	gd.panelCache = panels
+	gd.panelCacheExpires = now.Add(panelCacheTTL)
+	gd.panelCacheMu.Unlock()
+
+	return panels
+}
+
+func (gd *GameReader) readAllPanelsFresh() map[string]data.Panel {
 	base := gd.Process.moduleBaseAddressPtr + gd.offset.PanelManagerContainerOffset
 	panelStructPtr := uintptr(gd.Process.ReadUInt(base, Uint64))
 	panelPtr := uintptr(gd.Process.ReadUInt(panelStructPtr+0x58, Uint64))
