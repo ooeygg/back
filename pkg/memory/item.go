@@ -517,7 +517,7 @@ func (gd *GameReader) Inventory(rawPlayerUnits RawPlayerUnits, hover data.HoverD
 
 func (gd *GameReader) getItemStats(statsListExPtr uintptr) (stat.Stats, stat.Stats) {
 	// Initial full and base stats extraction
-	fullStats := gd.getStatsList(statsListExPtr + 0xA8)
+	fullStats := gd.getStatsList(statsListExPtr + 0xE8)
 	baseStats := gd.getStatsList(statsListExPtr + 0x30)
 
 	// Create empty LevelRequire stat .We will update it from inventory

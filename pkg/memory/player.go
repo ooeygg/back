@@ -46,8 +46,8 @@ func (gd *GameReader) GetRawPlayerUnits() RawPlayerUnits {
 			isCorpse := gd.Process.ReadUInt(playerUnit+0x1AE, Uint8)
 
 			statsListExPtr := uintptr(gd.Process.ReadUInt(playerUnit+0x88, Uint64))
-			stats := gd.getStatsList(statsListExPtr + 0x30)
-			baseStats := gd.getStatsList(statsListExPtr + 0xE8)
+			baseStats := gd.getStatsList(statsListExPtr + 0x30)
+			stats := gd.getStatsList(statsListExPtr + 0xE8)
 			states := gd.GetStates(statsListExPtr)
 			playerMode := mode.PlayerMode(gd.Process.ReadUInt(playerUnit+0x0c, Uint32))
 
@@ -214,7 +214,7 @@ func (gd *GameReader) GetStates(statsListExPtr uintptr) state.States {
 	var states state.States
 	for i := 0; i < 8; i++ {
 		offset := i * 4
-		stateByte := gd.Process.ReadUInt(statsListExPtr+0xAF0+uintptr(offset), Uint32)
+		stateByte := gd.Process.ReadUInt(statsListExPtr+0xB30+uintptr(offset), Uint32)
 
 		offset = (32 * i) - 1
 		states = append(states, calculateStates(stateByte, uint(offset))...)

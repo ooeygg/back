@@ -29,3 +29,27 @@ func TestKeyBindingForSkillTownPortalAlias(t *testing.T) {
 		t.Fatalf("KeyBindingForSkill(%v) = %#v; want %#v", skill.TomeOfTownPortal, got, expected)
 	}
 }
+
+func TestKeyBindingForSkillIdentifyAlias(t *testing.T) {
+	expected := KeyBinding{
+		Key1: [2]byte{0x71, 0x00},
+		Key2: [2]byte{0x00, 0x00},
+	}
+
+	kb := KeyBindings{
+		Skills: [16]SkillBinding{
+			{
+				SkillID:    skill.ScrollOfIdentify,
+				KeyBinding: expected,
+			},
+		},
+	}
+
+	got, ok := kb.KeyBindingForSkill(skill.TomeOfIdentify)
+	if !ok {
+		t.Fatalf("KeyBindingForSkill(%v) returned ok=false; want true", skill.TomeOfIdentify)
+	}
+	if got != expected {
+		t.Fatalf("KeyBindingForSkill(%v) = %#v; want %#v", skill.TomeOfIdentify, got, expected)
+	}
+}
