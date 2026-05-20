@@ -67,7 +67,7 @@ type SkillBinding struct {
 
 func (kb KeyBindings) KeyBindingForSkill(skillID skill.ID) (KeyBinding, bool) {
 	for _, sk := range kb.Skills {
-		if sk.SkillID == skillID {
+		if sk.SkillID == skillID || (skillID == skill.TomeOfTownPortal && sk.SkillID == skill.ScrollOfTownPortal) {
 			return sk.KeyBinding, true
 		}
 	}

@@ -46,8 +46,8 @@ func (gd *GameReader) GetRawPlayerUnits() RawPlayerUnits {
 			isCorpse := gd.Process.ReadUInt(playerUnit+0x1AE, Uint8)
 
 			statsListExPtr := uintptr(gd.Process.ReadUInt(playerUnit+0x88, Uint64))
-			baseStats := gd.getStatsList(statsListExPtr + 0x30)
-			stats := gd.getStatsList(statsListExPtr + 0xA8)
+			stats := gd.getStatsList(statsListExPtr + 0x30)
+			baseStats := gd.getStatsList(statsListExPtr + 0xE8)
 			states := gd.GetStates(statsListExPtr)
 			playerMode := mode.PlayerMode(gd.Process.ReadUInt(playerUnit+0x0c, Uint32))
 
@@ -184,9 +184,9 @@ func (gd *GameReader) getSkills(skillListPtr uintptr) map[skill.ID]skill.Points 
 	for skillPtr != 0 {
 		skillTxtPtr := uintptr(gd.Process.ReadUInt(skillPtr, Uint64))
 		skillTxt := uintptr(gd.Process.ReadUInt(skillTxtPtr, Uint16))
-		lvl := gd.Process.ReadUInt(skillPtr+0x40, Uint16)
+		lvl := gd.Process.ReadUInt(skillPtr+0x38, Uint16)
 		qty := gd.Process.ReadUInt(skillPtr+0x48, Uint16)
-		charges := gd.Process.ReadUInt(skillPtr+0x50, Uint16)
+		charges := gd.Process.ReadUInt(skillPtr+0x4C, Uint16)
 
 		shouldSetSkill := true
 		existingSkill, exists := skills[skill.ID(skillTxt)]
